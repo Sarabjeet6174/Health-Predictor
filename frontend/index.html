@@ -917,7 +917,7 @@
         }
 
         // API Configuration
-        const API_BASE_URL = 'http://localhost:8000/api';
+        const API_BASE_URL = 'http://localhost:8008/api';
         
         // Form Submission
         document.getElementById('predictionForm').addEventListener('submit', async function(e) {
@@ -933,6 +933,11 @@
             btn.disabled = true;
             
             try {
+                console.log('Making prediction request...');
+                console.log('API URL:', `${API_BASE_URL}/predictions/predict`);
+                console.log('Disease:', currentDisease);
+                console.log('Features:', data);
+                
                 // Call FastAPI backend
                 const response = await fetch(`${API_BASE_URL}/predictions/predict`, {
                     method: 'POST',
@@ -944,6 +949,9 @@
                         features: data
                     })
                 });
+                
+                console.log('Response status:', response.status);
+                console.log('Response OK:', response.ok);
                 
                 if (!response.ok) {
                     // Get error details from response
@@ -972,7 +980,7 @@
                 
             } catch (error) {
                 console.error('Prediction error:', error);
-                alert('Error making prediction. Make sure the backend server is running on http://localhost:8000\n\nError: ' + error.message);
+                alert('Error making prediction. Make sure the backend server is running on http://localhost:8008\n\nError: ' + error.message);
                 // Fallback to simulated prediction if API fails
                 const result = simulateMLPrediction(data, currentDisease);
                 displayResults(result);
@@ -989,10 +997,17 @@
             document.getElementById('result-content').classList.add('slide-in');
             
             const config = diseaseConfigs[currentDisease];
-            const percentage = result.ensemble;
+            // Normalize ensemble score: backend may return 0-1 or 0-100
+            let rawScore = Number(result.ensemble || 0);
+            if (!Number.isFinite(rawScore)) {
+                rawScore = 0;
+            }
+            // If it's a small number, assume it's a probability (0-1) and convert to percentage
+            let percentage = rawScore <= 1 ? rawScore * 100 : rawScore;
+            const displayPercentage = percentage.toFixed(1);
             
             // Update risk display
-            document.getElementById('risk-percentage').textContent = percentage + '%';
+            document.getElementById('risk-percentage').textContent = displayPercentage + '%';
             document.getElementById('confidence-score').textContent = result.confidence + '%';
             
             // Determine risk level

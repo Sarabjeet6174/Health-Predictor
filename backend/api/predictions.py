@@ -37,8 +37,12 @@ async def predict(request: PredictionRequest):
         PredictionResponse with risk scores and feature importance
     """
     try:
-        logger.info(f"Prediction request received for disease: {request.disease}")
+        logger.info("=" * 60)
+        logger.info("PREDICTION REQUEST RECEIVED")
+        logger.info("=" * 60)
+        logger.info(f"Disease: {request.disease}")
         logger.info(f"Features received: {list(request.features.keys())}")
+        logger.info(f"Feature values: {request.features}")
         
         # Validate disease type
         valid_diseases = ['diabetes', 'heart', 'stroke', 'liver', 'kidney']
