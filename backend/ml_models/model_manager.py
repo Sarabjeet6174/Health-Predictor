@@ -54,7 +54,7 @@ class ModelManager:
             except Exception as e:
                 logger.error(f"Error loading {disease} model: {str(e)}")
     
-    def predict(self, disease: str, features: Dict[str, float]) -> Dict[str, Any]:
+    def predict(self, disease: str, features: Dict[str, Any]) -> Dict[str, Any]:
         """
         Make prediction using the appropriate model
         
@@ -73,11 +73,56 @@ class ModelManager:
         # Get feature order from model
         feature_order = model_data.get('feature_order', [])
         
-        # Prepare input array
+        # Prepare input features (handle special cases per disease)
+        processed_features: Dict[str, float] = {}
+        
+        if disease == 'diabetes' and 'label_encoders' in model_data:
+            # Expect raw features matching the real diabetes dataset:
+            # gender, age, hypertension, heart_disease, smoking_history, bmi, HbA1c_level, blood_glucose_level
+            encoders = model_data.get('label_encoders', {})
+            gender_encoder = encoders.get('gender')
+            smoking_encoder = encoders.get('smoking')
+            
+            # Encode gender
+            if 'gender_encoded' in feature_order:
+                if 'gender' not in features:
+                    raise ValueError("Missing required feature: gender")
+                if gender_encoder is None:
+                    raise ValueError("Gender encoder not found in model data")
+                processed_features['gender_encoded'] = float(
+                    gender_encoder.transform([str(features['gender'])])[0]
+                )
+            
+            # Encode smoking history
+            if 'smoking_encoded' in feature_order:
+                if 'smoking_history' not in features:
+                    raise ValueError("Missing required feature: smoking_history")
+                if smoking_encoder is None:
+                    raise ValueError("Smoking history encoder not found in model data")
+                processed_features['smoking_encoded'] = float(
+                    smoking_encoder.transform([str(features['smoking_history'])])[0]
+                )
+            
+            # Copy numeric features directly
+            numeric_keys = ['age', 'hypertension', 'heart_disease', 'bmi', 'HbA1c_level', 'blood_glucose_level']
+            for key in numeric_keys:
+                if key in feature_order:
+                    if key not in features:
+                        raise ValueError(f"Missing required feature: {key}")
+                    processed_features[key] = float(features[key])
+        else:
+            # Generic case: assume features already numeric and keys match feature_order
+            for feature_name, value in features.items():
+                try:
+                    processed_features[feature_name] = float(value)
+                except (TypeError, ValueError):
+                    raise ValueError(f"Invalid numeric value for feature '{feature_name}': {value}")
+        
+        # Build input array in correct order
         input_array = []
         for feature in feature_order:
-            if feature in features:
-                input_array.append(float(features[feature]))
+            if feature in processed_features:
+                input_array.append(float(processed_features[feature]))
             else:
                 raise ValueError(f"Missing required feature: {feature}")
         

@@ -54,17 +54,24 @@ async def predict(request: PredictionRequest):
             logger.info(f"Available models: {list(model_manager.models.keys())}")
             raise HTTPException(status_code=400, detail=error_msg)
         
-        # Convert features to float with better error handling
-        features = {}
-        for k, v in request.features.items():
-            try:
-                features[k] = float(v)
-            except (ValueError, TypeError) as e:
-                error_msg = f"Invalid value for feature '{k}': {v}. Must be a number. Error: {str(e)}"
-                logger.error(error_msg)
-                raise HTTPException(status_code=400, detail=error_msg)
+        # Prepare features
+        raw_features = dict(request.features)
         
-        logger.info(f"Converted features: {features}")
+        # For non-diabetes diseases, convert all features to float
+        if request.disease != 'diabetes':
+            features = {}
+            for k, v in raw_features.items():
+                try:
+                    features[k] = float(v)
+                except (ValueError, TypeError) as e:
+                    error_msg = f"Invalid value for feature '{k}': {v}. Must be a number. Error: {str(e)}"
+                    logger.error(error_msg)
+                    raise HTTPException(status_code=400, detail=error_msg)
+            logger.info(f"Converted features: {features}")
+        else:
+            # For diabetes, allow categorical values (gender, smoking_history) and let ModelManager handle encoding
+            features = raw_features
+            logger.info(f"Using raw features for diabetes: {features}")
         
         # Make prediction
         result = model_manager.predict(request.disease, features)
